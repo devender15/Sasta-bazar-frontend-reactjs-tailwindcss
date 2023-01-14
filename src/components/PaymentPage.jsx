@@ -1,144 +1,96 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from 'axios';
+import { ToastContainer, toast } from "react-toastify";
 
-
-import { TextField } from "@material-ui/core";
 import { BsFillArrowLeftCircleFill } from "react-icons/bs";
 
-import PaytmLogo from '../assets/paytm.webp';
 
+const PaymentPage = ({ totalCart, user, token, setTotalCart, setQuantity }) => {
+  const [fname, setFname] = useState("");
+  const [phone, setPhone] = useState(0);
+  const [addr, setAddr] = useState("");
+  const [city, setCity] = useState("");
+  const [zipCode, setZipCode] = useState(0);
+  const [state, setState] = useState("");
 
-const PaymentPage = ({ totalCart, user, setTotalCart }) => {
   const navigate = useNavigate();
-  const [promo, setPromo] = useState("");
-  const [couponApplied, setCouponApplied] = useState(false);
-  const [error, setError] = useState(false);
-  
+
   // changing the title of the page
   document.title = `Checkout | Sasta Bazar`;
-
-  // using this promo code a new user can have upto 90% off discount
-  const PROMOCODE = "NEWUSER90";
 
   const myCart =
     localStorage.getItem("items") !== null
       ? JSON.parse(localStorage.getItem("items"))
       : {};
 
-  // storing titles of the all the products in the cart so that we can save it to the db when we do payment using paytm
-  const productsArray = [];
+  // storing titles and quantity of the all the products in the cart so that we can save it to the db when we do payment using paytm
+  const productSell = {};
 
-  for(let product in myCart){
-    productsArray.push(product)
-  }
-
-  // getting the actual total cart value because we want to restore the actual price when user removes the coupon
-  const getActualTotalCartValue = () => {
-    let prods = myCart;
-    let sum = 0;
-    for (let value in prods) {
-      sum += prods[value]?.quant * prods[value]?.price;
+  Object.keys(myCart).map((productName) => {
+    productSell[productName] = {
+      "quantity": myCart[productName].quant,
+      "price": myCart[productName].price
     }
-    return sum;
+  })
+
+
+  // showing the current status will we be using this toast message
+  const toastMessage = (type, message) => {
+    toast(message, {
+      type: type==="error" ? "error" : "success",
+      theme: "colored",
+      position: "top-center",
+      autoClose: 2000,
+    });
   };
 
-  const originalCartVal = getActualTotalCartValue();
+  // console.log(user);
 
-  const applyCoupon = () => {
-    if (promo === PROMOCODE) {
-      const discountVal = Math.round(totalCart * (1 - 0.9));
-      setTotalCart(discountVal);
-      setCouponApplied(true);
-      setError(false);
-
-      console.log(originalCartVal);
-    } else {
-      setError(true);
+  const placeOrder = () => {
+    // checking first if user has entered all shipping details or not
+    if (
+      fname.length === 0 ||
+      phone.length === 0 ||
+      addr.length === 0 ||
+      city.length === 0 ||
+      zipCode.length === 0 ||
+      state.length === 0
+    ) {
+      toastMessage("error", "Please enter all shipping details !");
+    } else {  
+      fetch(`${process.env.REACT_APP_API_URL}/payment/place-order`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token,
+        },
+        body: JSON.stringify({
+          "userId": user?.id,
+          "pname": JSON.stringify(productSell),
+          "fname": fname,
+          "phone": phone,
+          "city": city,
+          "zip_code": zipCode,
+          "state": state,
+          "address": addr,
+          "email": user.email,
+          "total_payment": totalCart
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if(data.status === "success") { 
+          toastMessage("success", "Order placed Successfully!");
+          localStorage.removeItem("items");
+          setTotalCart(0);
+          setQuantity(0);
+          navigate("/");
+        }
+        else {
+          toastMessage("error", "Something went wrong!");
+        }
+      })
     }
-  };
-
-  const removeCoupon = () => {
-    setTotalCart(originalCartVal);
-    setCouponApplied(false);
-    setPromo("");
-  };
-
-
-  const handleSuccess = (res) => {
-
-    // we will be getting response param_dict ( object ) from backend
-    let keyArr = Object.keys(res);
-    let valArr = Object.values(res);
-
-    // when we start the payment verification we will hide our Product form
-    document.getElementById("paymentFrm").style.display = "none";
-
-    // Lets create a form by DOM manipulation
-    // display messages as soon as payment starts
-    let heading1 = document.createElement("h1");
-    heading1.innerText = "Redirecting you to the paytm....";
-    let heading2 = document.createElement("h1");
-    heading2.innerText = "Please do not refresh your page....";
-
-    //create a form that will send necessary details to the paytm
-    let frm = document.createElement("form");
-    frm.action = "https://securegw-stage.paytm.in/order/process/";
-    frm.method = "post";
-    frm.name = "paytmForm";
-
-    // we have to pass all the credentials that we've got from param_dict
-    keyArr.map((k, i) => {
-      // create an input element
-      let inp = document.createElement("input");
-      inp.key = i;
-      inp.type = "hidden";
-      // input tag's name should be a key of param_dict
-      inp.name = k;
-      // input tag's value should be a value associated with the key that we are passing in inp.name
-      inp.value = valArr[i];
-      // append those all input tags in the form tag
-      frm.appendChild(inp);
-    });
-
-    // append all the above tags into the body tag
-    document.body.appendChild(heading1);
-    document.body.appendChild(heading2);
-    document.body.appendChild(frm);
-    // finally submit that form
-    frm.submit();
-
-    // if you remember, the param_dict also has "'CALLBACK_URL': 'http://127.0.0.1:8000/payment/handlepayment/'"
-    // so as soon as Paytm gets the payment it will hit that callback URL with some response and
-    // on the basis of that response we are displaying the "payment successful" or "failed" message
-
-  }
-
-
-  const startPayment = async () => {
-    let bodyData = new FormData();
-
-    // send data to the backend
-    bodyData.append("amount", totalCart);
-    bodyData.append("name", JSON.stringify(productsArray));
-    bodyData.append("email", user?.username);
-
-    await axios({
-      url: `${process.env.REACT_APP_API_URL}/payment/pay/`,
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      data: bodyData,
-    }).then((res) => {
-      // we will retrieve the param_dict that we are sending from the backend with
-      // all the necessary credentials, and we will pass it to the handleSuccess() func 
-     //  for the further process
-      if (res) {
-        handleSuccess(res.data.param_dict);
-      }
-    });
   };
 
   let myCartItems =
@@ -163,7 +115,7 @@ const PaymentPage = ({ totalCart, user, setTotalCart }) => {
             Your cart is empty 😞 Please go do some shopping !
           </p>
         ) : (
-          <div  className="p-1 md:grid md:grid-cols-2 gap-6">
+          <div className="p-1 md:grid md:grid-cols-2 gap-6">
             <div className="flex flex-col mt-4">
               {Object.values(myCartItems).map((product) => {
                 return (
@@ -171,7 +123,10 @@ const PaymentPage = ({ totalCart, user, setTotalCart }) => {
                     className="grid grid-cols-2 space-x-2 bg-white p-2 w-fit m-2"
                     key={product.name}
                   >
-                    <div className="flex justify-center hover:cursor-pointer" onClick={() => navigate(`/product-detail/${product.id}`)}>
+                    <div
+                      className="flex justify-center hover:cursor-pointer"
+                      onClick={() => navigate(`/product-detail/${product.id}`)}
+                    >
                       <img
                         src={product.image}
                         alt="product"
@@ -191,57 +146,9 @@ const PaymentPage = ({ totalCart, user, setTotalCart }) => {
                 );
               })}
 
-              <div className="my-4 bg-white p-1">
-                {/* adding input field for applying promo code */}
-                <div className="flex space-x-2 items-center">
-                  <p className="font-light mt-4 mr-4">Have promo code? </p>
-                  <div>
-                    <TextField
-                      id="standard-basic"
-                      label="Promo Code"
-                      variant="standard"
-                      value={promo}
-                      onChange={(e) => setPromo(e.target.value)}
-                    />
-                    {couponApplied ? (
-                      <p className="text-green-500">Coupon applied !</p>
-                    ) : (
-                      ""
-                    )}
-
-                    {/* showing error is user enters wrong promo code */}
-                    {error ? (
-                      <p className="text-red-600">Wrong promo code !</p>
-                    ) : (
-                      ""
-                    )}
-                  </div>
-                  {couponApplied ? (
-                    <button
-                      className="p-2 bg-red-700 rounded-md text-white font-bold"
-                      onClick={removeCoupon}
-                    >
-                      Remove
-                    </button>
-                  ) : (
-                    <button
-                      className="p-2 bg-blue-700 rounded-md text-white font-bold"
-                      onClick={applyCoupon}
-                    >
-                      Apply
-                    </button>
-                  )}
-                </div>
-
-                {/* showing updated cart value */}
-                <h1 className="font-bold text-xl my-6 flex items-center">
-                  Subtotal: ₹{totalCart}
-                  {couponApplied && (
-                    <p className="text-green-600 italic ml-2 text-sm">
-                      Yeah 90% off 😃
-                    </p>
-                  )}
-                </h1>
+              <div className="p-2 my-6 bg-white">
+                <p className="font-bold text-2xl">Total Price: ₹{totalCart}</p>
+                {/* <p>Total Cart Items: </p> */}
               </div>
 
               {/* shipping address */}
@@ -254,6 +161,8 @@ const PaymentPage = ({ totalCart, user, setTotalCart }) => {
                     <label htmlFor="fname">Full Name</label>
                     <input
                       type="text"
+                      value={fname}
+                      onChange={(e) => setFname(e.target.value)}
                       id="fname"
                       className="border-2 border-black p-1 outline-none rounded-md bg-gray-300 font-bold"
                       required
@@ -265,6 +174,8 @@ const PaymentPage = ({ totalCart, user, setTotalCart }) => {
                     <input
                       type="number"
                       id="phone"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
                       className="border-2 border-black p-1 outline-none rounded-md bg-gray-300 font-bold"
                       required
                     />
@@ -275,6 +186,8 @@ const PaymentPage = ({ totalCart, user, setTotalCart }) => {
                     <input
                       type="text"
                       id="address"
+                      value={addr}
+                      onChange={(e) => setAddr(e.target.value)}
                       className="border-2 border-black p-1 outline-none rounded-md bg-gray-300 font-bold"
                       required
                     />
@@ -285,6 +198,8 @@ const PaymentPage = ({ totalCart, user, setTotalCart }) => {
                     <input
                       type="text"
                       id="city"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
                       className="border-2 border-black p-1 outline-none rounded-md bg-gray-300 font-bold"
                       required
                     />
@@ -295,6 +210,8 @@ const PaymentPage = ({ totalCart, user, setTotalCart }) => {
                     <input
                       type="text"
                       id="zip"
+                      value={zipCode}
+                      onChange={(e) => setZipCode(e.target.value)}
                       className="border-2 border-black p-1 outline-none rounded-md bg-gray-300 font-bold"
                       required
                     />
@@ -305,6 +222,8 @@ const PaymentPage = ({ totalCart, user, setTotalCart }) => {
                     <input
                       type="text"
                       id="state"
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
                       className="border-2 border-black p-1 outline-none rounded-md bg-gray-300 font-bold"
                       required
                     />
@@ -312,22 +231,26 @@ const PaymentPage = ({ totalCart, user, setTotalCart }) => {
                 </div>
               </div>
             </div>
-            
 
             {/* payment section */}
             {
-              <div id="paymentFrm" className="flex flex-col justify-center items-center md:justify-start mr-10">
+              <div
+                id="paymentFrm"
+                className="flex flex-col justify-center items-center md:justify-start mr-10"
+              >
                 <h1 className="text-center text-xl my-8">Payment methods</h1>
-                
-                <div className="w-[60vw] h-[15vh] md:w-[20vw] bg-white p-1">
-                  <img src={PaytmLogo} alt="paytm-button" onClick={ startPayment} className="w-full h-full hover:cursor-pointer"/>
-                </div>
-                
+
+                <p>Currently only <b> Cash On Delivery </b> is available.</p>
+
+                <button className="p-2 bg-green-600 rounded-md text-white font-bold my-4 w-[30vw] h-15" onClick={placeOrder}> Order Now</button>
+
+
               </div>
             }
           </div>
         )}
       </div>
+      <ToastContainer />
     </>
   );
 };

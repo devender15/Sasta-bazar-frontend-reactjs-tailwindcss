@@ -5,3 +5,6 @@ export { default as UserProfile } from './UserProfile';
 export { default as Feed } from './Feed';
 export { default as Search } from './Search';
 export { default as ProductDetail } from './ProductDetail';
+export { default as Spinner } from './Spinner';
+export { default as Orders } from './Orders';
+export { default as ChangePassword } from './ChangePassword';

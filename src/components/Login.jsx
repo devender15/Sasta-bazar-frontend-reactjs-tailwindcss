@@ -4,18 +4,18 @@ import { TextField } from "@material-ui/core";
 import { Link, useNavigate } from "react-router-dom";
 
 const Login = () => {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const navigate = useNavigate();
 
-  document.title = "Login | Sasta Bazar";
+  document.title = "Login | My Shop";
   localStorage.clear(); // for safety purpose
 
   const loginHandler = async () => {
     const resp = await axios.post(
       `${process.env.REACT_APP_API_URL}/user-auth/login`,
-      { username: username, password: password }
+      { email: email, password: password }
     );
 
     // setting the access token in localStorage for giving access to the user
@@ -28,7 +28,7 @@ const Login = () => {
   return (
     <div className="flex flex-col justify-center items-center">
       <h1 className="text-3xl text-center mt-4 md:text-4xl font-bold">
-        Sasta Bazar
+        My Shop
       </h1>
 
       <h2 className="text-purple-600 mt-4 text-2xl">Login </h2>
@@ -36,11 +36,12 @@ const Login = () => {
       <div className="flex flex-col w-[85vw] h-[60vh] mt-12 rounded-md shadow-lg space-y-4 p-4 md:w-[30vw]">
         <TextField
           id="outlined-basic"
-          label="Username"
+          label="Email"
+          type={email}
           varient="outlined"
           required
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
         />
 
         <TextField
@@ -55,7 +56,7 @@ const Login = () => {
 
         <button
           className="bg-blue-600 p-2 rounded-lg border-none text-white font-bold hover:bg-blue-700 hover:transition-all"
-          onClick={loginHandler}
+          onClick={loginHandler} disabled={email.length === 0 && password.length === 0}
         >
           Login
         </button>
@@ -81,7 +82,6 @@ const Login = () => {
         </div>
       </div>
 
-      <p className="absolute bottom-0 pb-6">Made with  🤎 by Dev</p>
     </div>
   );
 };

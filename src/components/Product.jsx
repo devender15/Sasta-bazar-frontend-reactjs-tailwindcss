@@ -10,7 +10,7 @@ const Product = ({ product }) => {
     <motion.div layout animate={{opacity: 1}} initial={{opacity: 0}} exit={{opacity: 0}} id={`div-${product.productId}`} className='flex flex-col rounded-lg bg-white shadow-md p-2 hover:cursor-pointer md:w-[20vw] justify-center space-y-4' onClick={() => navigate(`/product-detail/${product.productId}`)}>
 
       <div className='w-fit'> 
-        <img className='w-70 h-50' src={product.productImage.includes(`${process.env.REACT_APP_API_URL}`) ? product.productImage : process.env.REACT_APP_API_URL + product.productImage} alt="prod" />
+        <img className='w-70 h-50' src={product.productImage} alt="prod" />
       </div>
 
       <h2 className='font-bold'>{product?.productName}</h2>

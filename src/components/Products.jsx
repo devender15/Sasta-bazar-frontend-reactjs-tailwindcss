@@ -7,13 +7,14 @@ import PaymentPage from "./PaymentPage";
 import { Navbar, Feed, ProductDetail, Search } from "/";
 import { fetchUser } from "../utils/fetchUser";
 
-const Products = ({ user }) => {
+const Products = ({ user, token }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [products, setProducts] = useState([]);
   const [quantity, setQuantity] = useState(0);
   const [prodProperty, setProdProperty] = useState({});
   const [itemVal, setItemVal] = useState(0);
   const [totalCart, setTotalCart] = useState(0);
+  const [cart, setCart] = useState("");
   const navigate = useNavigate();
 
   // this is the function for showing the toast success message 
@@ -26,15 +27,41 @@ const Products = ({ user }) => {
     });
   }
 
+  const getCart = () => {
+    fetch(`${process.env.REACT_APP_API_URL}/user-auth/update-cart`, {
+      method: "GET",
+      headers: {
+        Authorization: "Bearer " + token,
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        localStorage.setItem("items", data);
+      })
+  };
+
+  const updateCart = (cartVal) => {
+    fetch(`${process.env.REACT_APP_API_URL}/user-auth/update-cart`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token,
+      },
+      body: {
+        "cart": cartVal
+      }
+    });
+  };
+
   // after loading the component the total cart items value should be there so thats why we are using useEffect and getting the value from localStorage
   useEffect(() => {
+
     // incrementing the quantity of the cart
     let prods = JSON.parse(localStorage.getItem("items"));
     let sum = 0;
     for (let value in prods) {
       sum += prods[value].quant;
     }
-
     setQuantity(sum);
   }, []);
 
@@ -89,6 +116,7 @@ const Products = ({ user }) => {
 
       // setting all added items to localStorage so that we can get it even after reloading the page
       localStorage.setItem("items", JSON.stringify(myCart));
+      // updateCart(myCart);
 
       // incrementing the quantity of the cart
       let prods = JSON.parse(localStorage.getItem("items"));
@@ -155,6 +183,7 @@ const Products = ({ user }) => {
                 setItemVal={setItemVal}
                 totalCart={totalCart}
                 user={user && user}
+                // getCart={getCart}
               />
             }
           />
@@ -173,6 +202,8 @@ const Products = ({ user }) => {
                 totalCart={totalCart}
                 user={user}
                 setTotalCart={setTotalCart}
+                token={token}
+                setQuantity={setQuantity}
               />
             }
           />
